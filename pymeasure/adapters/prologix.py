@@ -142,7 +142,9 @@ class PrologixEthernetAdatper:
         if isinstance(ressource, VISAAdapter):
             self.adapter = ressource
         else:
-            self.adapter = VISAAdapter('TCPIP::{}::1234::SOCKET'.format(ressource), read_termination='\n')
+            self.adapter = VISAAdapter('TCPIP::{}::1234::SOCKET'.format(ressource),
+                                       read_termination='\n',
+                                       write_termination='\n')
         self.address = address
         self.rw_delay = rw_delay
         self.auto = auto
@@ -185,9 +187,9 @@ class PrologixEthernetAdatper:
         """
         if self.address is not None:
             address_command = "++addr %d" % self.address
-            self.connection.write(address_command)
-        command += "\n"
-        self.connection.write(command)
+            self.adapter.write(address_command)
+        # command += "\n"
+        self.adapter.write(command)
 
     def read(self):
         """ Reads the response of the instrument until timeout.
@@ -195,4 +197,16 @@ class PrologixEthernetAdatper:
         :return: String ASCII response of the instrument.
         """
         self.write("++read")
-        return self.connection.read()
+        return self.adapter.read()
+
+    def gpib(self, address, rw_delay=None):
+        """ Returns and PrologixAdapter object that references the GPIB
+        address specified, while sharing the Serial connection with other
+        calls of this function
+
+        :param address: Integer GPIB address of the desired instrument
+        :param rw_delay: Set a custom Read/Write delay for the instrument
+        :returns: PrologixAdapter for specific GPIB address
+        """
+        rw_delay = rw_delay or self.rw_delay
+        return PrologixEthernetAdatper(self.adapter, address, rw_delay=rw_delay)
