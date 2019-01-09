@@ -140,7 +140,17 @@ class PrologixEthernetAdatper:
 
     PORT = 1234
 
-    def __init__(self, resource, address=None, rw_delay=None, auto=0, eoi=0, **kwargs):
+    def __init__(self, resource, address=None, rw_delay=None, auto=0, eoi=0, eos=0, **kwargs):
+        """
+
+        :param resource: A string representing the IP address of the prologix adapter
+        :param address: Integer GPIB address of the desired instrument
+        :param rw_delay: An optional delay to set between a write and read call for slow to respond instruments.
+        :param auto: Default to 0 to turn off read-after-write and address instrument to listen
+        :param eoi: Default to 0 to disable EOI assertion
+        :param eos: Default to 0 to append CR+LF to instrument commands
+        :param kwargs:
+        """
         if isinstance(resource, VISAAdapter):
             self.adapter = resource
             self.resource = self.adapter.connection.resource_info[0][3].split('::')[1]
@@ -149,13 +159,21 @@ class PrologixEthernetAdatper:
                                        read_termination='\n',
                                        write_termination='\n')
             self.resource = resource
+
         self.address = address
         self.rw_delay = rw_delay
         self.auto = auto
         self.eoi = eoi
+        self.eoi = eos
 
     @property
     def auto(self):
+        """
+        Prologix GPIB-ETHERNET controller can be configured to automatically address
+        instruments to talk after sending them a command in order to read their response. The
+        feature called, Read-After-Write, saves the user from having to issue read commands
+        repeatedly. This property enabled or disabled the Read-After-Write feature.
+        """
         self.adapter.write("++auto")
         return int(self.adapter.read())
 
@@ -165,12 +183,33 @@ class PrologixEthernetAdatper:
 
     @property
     def eoi(self):
+        """
+        This property enables or disables the assertion of the EOI signal with the last character
+        of any command sent over GPIB port. Some instruments require EOI signal to be
+        asserted in order to properly detect the end of a command.
+        """
         self.adapter.write("++eoi")
         return int(self.adapter.read())
 
-    @auto.setter
+    @eoi.setter
     def eoi(self, value):
         self.adapter.write("++eoi {}".format(value))
+
+    @property
+    def eos(self):
+        """
+        This command specifies GPIB termination characters. When data from host is received
+        over the network, all non-escaped LF, CR and ESC characters are removed and GPIB
+        terminators, as specified by this command, are appended before sending the data to
+        instruments. This command does not affect data from instruments received over GPIB
+        port.
+        """
+        self.adapter.write("++eos")
+        return int(self.adapter.read())
+
+    @eos.setter
+    def eos(self, value):
+        self.adapter.write("++eos {}".format(value))
 
     @property
     def version(self):
