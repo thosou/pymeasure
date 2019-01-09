@@ -164,7 +164,7 @@ class PrologixEthernetAdatper:
         self.rw_delay = rw_delay
         self.auto = auto
         self.eoi = eoi
-        self.eoi = eos
+        self.eos = eos
 
     def reset(self):
         """
