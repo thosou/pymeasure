@@ -138,8 +138,61 @@ class PrologixAdapter(SerialAdapter):
 
 class PrologixEthernetAdatper:
 
-    def __init__(self, ressource, address=None, rw_delay=None, **kwargs):
+    def __init__(self, ressource, address=None, rw_delay=None, auto=0, eoi=0, **kwargs):
         if isinstance(ressource, VISAAdapter):
-            self.adapater = ressource
+            self.adapter = ressource
         else:
-            self.adapater = VISAAdapter('TCPIP::{}::1234::SOCKET'.format(ressource), read_termination='\n')
+            self.adapter = VISAAdapter('TCPIP::{}::1234::SOCKET'.format(ressource), read_termination='\n')
+        self.address = address
+        self.rw_delay = rw_delay
+        self.auto = auto
+        self.eoi = eoi
+
+    @property
+    def auto(self):
+        self.adapter.write("++auto")
+        return int(self.adapter.read())
+
+    @auto.setter
+    def auto(self, value):
+        self.adapter.write("++auto {}".format(value))
+
+    @property
+    def eoi(self):
+        self.adapter.write("++eoi")
+        return int(self.adapter.read())
+
+    @auto.setter
+    def eoi(self, value):
+        self.adapter.write("++eoi {}".format(value))
+
+    def ask(self, command):
+        """ Ask the Prologix controller, include a forced delay for some instruments.
+
+        :param command: SCPI command string to be sent to instrument
+        """
+
+        self.write(command)
+        if self.rw_delay is not None:
+            time.sleep(self.rw_delay)
+        return self.read()
+
+    def write(self, command):
+        """ Writes the command to the GPIB address stored in the
+        :attr:`.address`
+
+        :param command: SCPI command string to be sent to the instrument.
+        """
+        if self.address is not None:
+            address_command = "++addr %d" % self.address
+            self.connection.write(address_command)
+        command += "\n"
+        self.connection.write(command)
+
+    def read(self):
+        """ Reads the response of the instrument until timeout.
+
+        :return: String ASCII response of the instrument.
+        """
+        self.write("++read")
+        return self.connection.read()
