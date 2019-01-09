@@ -166,6 +166,13 @@ class PrologixEthernetAdatper:
         self.eoi = eoi
         self.eoi = eos
 
+    def reset(self):
+        """
+        This command performs a power-on reset of the controller. The process takes about 5
+        seconds. All input received over the network during this time are ignored and the connection is closed.
+        """
+        self.resource.write('++rst')
+
     @property
     def auto(self):
         """
