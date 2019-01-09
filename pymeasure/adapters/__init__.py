@@ -30,6 +30,7 @@ log.addHandler(logging.NullHandler())
 
 try:
     from pymeasure.adapters.visa import VISAAdapter
+    from pymeasure.adapters.prologix import PrologixEthernetAdatper
 except ImportError:
     log.warning("PyVISA library could not be loaded")
 
