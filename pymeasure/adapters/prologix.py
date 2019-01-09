@@ -26,7 +26,7 @@ import time
 import serial
 
 from .serial import SerialAdapter
-
+from .visa import VISAAdapter
 
 class PrologixAdapter(SerialAdapter):
     """ Encapsulates the additional commands necessary
@@ -134,3 +134,12 @@ class PrologixAdapter(SerialAdapter):
                 self.connection.port, self.address)
         else:
             return "<PrologixAdapter(port='%s')>" % self.connection.port
+
+
+class PrologixEthernetAdatper:
+
+    def __init__(self, ressource, address=None, rw_delay=None, **kwargs):
+        if isinstance(ressource, VISAAdapter):
+            self.adapater = ressource
+        else:
+            self.adapater = VISAAdapter('TCPIP::{}::1234::SOCKET'.format(ressource), read_termination='\n')
