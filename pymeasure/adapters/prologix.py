@@ -200,7 +200,6 @@ class PrologixEthernetAdatper:
         if self.address is not None:
             address_command = "++addr %d" % self.address
             self.adapter.write(address_command)
-        # command += "\n"
         self.adapter.write(command)
 
     def read(self):
@@ -212,13 +211,13 @@ class PrologixEthernetAdatper:
         return self.adapter.read()
 
     def gpib(self, address, rw_delay=None):
-        """ Returns and PrologixAdapter object that references the GPIB
-        address specified, while sharing the Serial connection with other
+        """ Returns and PrologixEthernetAdatper object that references the GPIB
+        address specified, while sharing the visa socket connection with other
         calls of this function
 
         :param address: Integer GPIB address of the desired instrument
         :param rw_delay: Set a custom Read/Write delay for the instrument
-        :returns: PrologixAdapter for specific GPIB address
+        :returns: PrologixEthernetAdatper for specific GPIB address
         """
         rw_delay = rw_delay or self.rw_delay
         return PrologixEthernetAdatper(self.adapter, address, rw_delay=rw_delay)
