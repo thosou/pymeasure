@@ -172,6 +172,14 @@ class PrologixEthernetAdatper:
     def eoi(self, value):
         self.adapter.write("++eoi {}".format(value))
 
+    @property
+    def version(self):
+        """
+        Returns the version string of the Prologix controller
+        """
+        self.adapter.write('++ver')
+        return self.adapter.read()
+
     def ask(self, command):
         """ Ask the Prologix controller, include a forced delay for some instruments.
 
