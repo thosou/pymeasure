@@ -138,13 +138,17 @@ class PrologixAdapter(SerialAdapter):
 
 class PrologixEthernetAdatper:
 
-    def __init__(self, ressource, address=None, rw_delay=None, auto=0, eoi=0, **kwargs):
-        if isinstance(ressource, VISAAdapter):
-            self.adapter = ressource
+    PORT = 1234
+
+    def __init__(self, resource, address=None, rw_delay=None, auto=0, eoi=0, **kwargs):
+        if isinstance(resource, VISAAdapter):
+            self.adapter = resource
+            self.resource = self.adapter.connection.resource_info[0][3].split('::')[1]
         else:
-            self.adapter = VISAAdapter('TCPIP::{}::1234::SOCKET'.format(ressource),
+            self.adapter = VISAAdapter('TCPIP::{}::{}::SOCKET'.format(resource, self.PORT),
                                        read_termination='\n',
                                        write_termination='\n')
+            self.resource = resource
         self.address = address
         self.rw_delay = rw_delay
         self.auto = auto
@@ -210,3 +214,10 @@ class PrologixEthernetAdatper:
         """
         rw_delay = rw_delay or self.rw_delay
         return PrologixEthernetAdatper(self.adapter, address, rw_delay=rw_delay)
+
+    def __repr__(self):
+        if self.address is not None:
+            return "<PrologixEthernetAdatper(resource={}, address={})>".format(
+                self.resource, self.address)
+        else:
+            return "<PrologixEthernetAdatper(resource={})>".format(self.resource)
