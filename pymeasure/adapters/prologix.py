@@ -152,13 +152,13 @@ class PrologixEthernetAdatper:
         :param kwargs:
         """
         if isinstance(resource, VISAAdapter):
-            self.adapter = resource
-            self.resource = self.adapter.connection.resource_info[0][3].split('::')[1]
+            self.resource = resource
+            self.ip = self.resource.connection.resource_info[0][3].split('::')[1]
         else:
-            self.adapter = VISAAdapter('TCPIP::{}::{}::SOCKET'.format(resource, self.PORT),
+            self.resource = VISAAdapter('TCPIP::{}::{}::SOCKET'.format(resource, self.PORT),
                                        read_termination='\n',
                                        write_termination='\n')
-            self.resource = resource
+            self.ip = resource
 
         self.address = address
         self.rw_delay = rw_delay
@@ -174,12 +174,12 @@ class PrologixEthernetAdatper:
         feature called, Read-After-Write, saves the user from having to issue read commands
         repeatedly. This property enabled or disabled the Read-After-Write feature.
         """
-        self.adapter.write("++auto")
-        return int(self.adapter.read())
+        self.resource.write("++auto")
+        return int(self.resource.read())
 
     @auto.setter
     def auto(self, value):
-        self.adapter.write("++auto {}".format(value))
+        self.resource.write("++auto {}".format(value))
 
     @property
     def eoi(self):
@@ -188,12 +188,12 @@ class PrologixEthernetAdatper:
         of any command sent over GPIB port. Some instruments require EOI signal to be
         asserted in order to properly detect the end of a command.
         """
-        self.adapter.write("++eoi")
-        return int(self.adapter.read())
+        self.resource.write("++eoi")
+        return int(self.resource.read())
 
     @eoi.setter
     def eoi(self, value):
-        self.adapter.write("++eoi {}".format(value))
+        self.resource.write("++eoi {}".format(value))
 
     @property
     def eos(self):
@@ -204,20 +204,20 @@ class PrologixEthernetAdatper:
         instruments. This command does not affect data from instruments received over GPIB
         port.
         """
-        self.adapter.write("++eos")
-        return int(self.adapter.read())
+        self.resource.write("++eos")
+        return int(self.resource.read())
 
     @eos.setter
     def eos(self, value):
-        self.adapter.write("++eos {}".format(value))
+        self.resource.write("++eos {}".format(value))
 
     @property
     def version(self):
         """
         Returns the version string of the Prologix controller
         """
-        self.adapter.write('++ver')
-        return self.adapter.read()
+        self.resource.write('++ver')
+        return self.resource.read()
 
     def ask(self, command):
         """ Ask the Prologix controller, include a forced delay for some instruments.
@@ -238,8 +238,8 @@ class PrologixEthernetAdatper:
         """
         if self.address is not None:
             address_command = "++addr %d" % self.address
-            self.adapter.write(address_command)
-        self.adapter.write(command)
+            self.resource.write(address_command)
+        self.resource.write(command)
 
     def read(self):
         """ Reads the response of the instrument until timeout.
@@ -247,7 +247,7 @@ class PrologixEthernetAdatper:
         :return: String ASCII response of the instrument.
         """
         self.write("++read")
-        return self.adapter.read()
+        return self.resource.read()
 
     def gpib(self, address, rw_delay=None):
         """ Returns and PrologixEthernetAdatper object that references the GPIB
@@ -259,11 +259,11 @@ class PrologixEthernetAdatper:
         :returns: PrologixEthernetAdatper for specific GPIB address
         """
         rw_delay = rw_delay or self.rw_delay
-        return PrologixEthernetAdatper(self.adapter, address, rw_delay=rw_delay)
+        return PrologixEthernetAdatper(self.resource, address, rw_delay=rw_delay)
 
     def __repr__(self):
         if self.address is not None:
             return "<PrologixEthernetAdatper(resource={}, address={})>".format(
-                self.resource, self.address)
+                self.ip, self.address)
         else:
-            return "<PrologixEthernetAdatper(resource={})>".format(self.resource)
+            return "<PrologixEthernetAdatper(resource={})>".format(self.ip)
