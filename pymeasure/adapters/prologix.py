@@ -27,6 +27,7 @@ import serial
 
 from .serial import SerialAdapter
 from .visa import VISAAdapter
+from .adapter import Adapter
 
 class PrologixAdapter(SerialAdapter):
     """ Encapsulates the additional commands necessary
@@ -136,13 +137,12 @@ class PrologixAdapter(SerialAdapter):
             return "<PrologixAdapter(port='%s')>" % self.connection.port
 
 
-class PrologixEthernetAdatper:
+class PrologixEthernetAdatper(Adapter):
 
     PORT = 1234
 
     def __init__(self, resource, address=None, rw_delay=None, auto=0, eoi=0, eos=0, **kwargs):
         """
-
         :param resource: A string representing the IP address of the prologix adapter
         :param address: Integer GPIB address of the desired instrument
         :param rw_delay: An optional delay to set between a write and read call for slow to respond instruments.
