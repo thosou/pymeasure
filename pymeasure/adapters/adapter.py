@@ -21,10 +21,13 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 #
+import logging
 
 import numpy as np
 from copy import copy
 
+log = logging.getLogger(__name__)
+log.addHandler(logging.NullHandler())
 
 class Adapter(object):
     """ Base class for Adapter child classes, which adapt between the Instrument 
@@ -70,6 +73,8 @@ class Adapter(object):
         """
         results = str(self.ask(command)).strip()
         results = results.split(separator)
+        log.debug(f"results from values: <{results}>")
+        results[-1] = results[-1].split(";")[0]  # remove the OPC status if any
         for i, result in enumerate(results):
             try:
                 if cast == bool:
