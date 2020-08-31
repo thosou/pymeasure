@@ -146,6 +146,7 @@ class Instrument(object):
                 validator=lambda v, vs: v, values=(), map_values=False,
                 get_process=lambda v: v, set_process=lambda v: v,
                 check_set_errors=False, check_get_errors=False,
+                sync_command=None,
                 **kwargs):
         """Returns a property for the class based on the supplied
         commands. This property may be set and read from the
@@ -166,6 +167,7 @@ class Instrument(object):
                             before value mapping, returning the processed value
         :param check_set_errors: Toggles checking errors after setting
         :param check_get_errors: Toggles checking errors after getting
+        :param sync_command: An SCPI command *WAI, *OPC or *OPC? for command synchronization.
         """
 
         if map_values and isinstance(values, dict):
@@ -173,7 +175,14 @@ class Instrument(object):
             inverse = {v: k for k, v in values.items()}
 
         def fget(self):
-            vals = self.values(get_command, **kwargs)
+
+            if sync_command is None:
+                vals = self.values(get_command, **kwargs)
+            elif sync_command in ["*WAI", "*OPC", "*OPC?"]:
+                vals = self.values(get_command + ";" + sync_command, **kwargs)
+            else:
+                raise ValueError("{} is not in {}".format(sync_command, ["*WAI", "*OPC", "*OPC?"]))
+
             if check_get_errors:
                 self.check_errors()
             if len(vals) == 1:
@@ -206,7 +215,16 @@ class Instrument(object):
                     'Values of type `{}` are not allowed '
                     'for Instrument.control'.format(type(values))
                 )
-            self.write(set_command % value)
+            if sync_command is None:
+                self.write(set_command % value)
+            elif sync_command in ["*WAI", "*OPC"]:
+                self.write((set_command + ";" + sync_command) % value)
+            elif sync_command == "*OPC?":
+                self.write((set_command + ";" + sync_command) % value)
+                self.read()
+            else:
+                raise ValueError("{} is not in {}".format(sync_command, ["*WAI", "*OPC", "*OPC?"]))
+
             if check_set_errors:
                 self.check_errors()
 
