@@ -27,6 +27,9 @@ import re
 
 import numpy as np
 
+import time
+from time import sleep
+
 from pymeasure.adapters import FakeAdapter
 from pymeasure.adapters.visa import VISAAdapter
 
@@ -141,12 +144,82 @@ class Instrument(object):
          to viReadSTB function of the VISA library."""
         return self.adapter.connection.read_stb()
 
+    def stb_polling(self, timeout=20, interval=0.1, mask=0b00100000):
+        start = time.time()
+        while True:
+            stb = self.read_stb()
+            sleep(interval)
+            elapsed = time.time() - start
+            if stb & mask:
+                break
+            if elapsed > timeout:
+                raise Exception("STB polling timeout")
+        return stb
+
+    def write_sync(self, command, sync_method="opc_query"):
+        """ Writes a command to the instrument
+
+        :param command: SCPI command string to be sent to the instrument
+        """
+        if sync_method == "opc_query":
+            self.write(command + ";*OPC?")
+            self.read()
+        elif sync_method == "stb_polling":
+            self.write("*ESE 1")
+            self.ask("*ESR?")
+            self.write(command + ";*OPC")
+            self.stb_polling()
+        else:
+            self.write(command)
+
+    def ask_sync(self, command, sync_method="opc_query"):
+        """ Writes a command to the instrument
+
+        :param command: SCPI command string to be sent to the instrument
+        """
+        if sync_method == "opc_query":
+            self.write(command + ";*OPC?")
+            result = self.read()
+        elif sync_method == "stb_polling":
+            self.write("*ESE 1")
+            self.ask("*ESR?")
+            self.write(command + ";*OPC")
+            self.stb_polling()
+            result = self.read()
+        else:
+            result = self.ask(command)
+        log.debug(result)
+        return result.split(";")[0]  # remove the OPC status if any
+
+    def values_sync(self, command, separator=',', cast=float, sync_method="opc_query"):
+        """ Writes a command to the instrument and returns a list of formatted
+        values from the result
+
+        :param command: SCPI command to be sent to the instrument
+        :param separator: A separator character to split the string into a list
+        :param cast: A type to cast the result
+        :returns: A list of the desired type, or strings where the casting fails
+        """
+        results = str(self.ask_sync(command, sync_method)).strip()
+        results = results.split(separator)
+        for i, result in enumerate(results):
+            try:
+                if cast == bool:
+                    # Need to cast to float first since results are usually
+                    # strings and bool of a non-empty string is always True
+                    results[i] = bool(float(result))
+                else:
+                    results[i] = cast(result)
+            except Exception:
+                pass  # Keep as string
+        return results
+
     @staticmethod
     def control(get_command, set_command, docs,
                 validator=lambda v, vs: v, values=(), map_values=False,
                 get_process=lambda v: v, set_process=lambda v: v,
                 check_set_errors=False, check_get_errors=False,
-                sync_command=None,
+                sync_method=None,
                 **kwargs):
         """Returns a property for the class based on the supplied
         commands. This property may be set and read from the
@@ -167,7 +240,7 @@ class Instrument(object):
                             before value mapping, returning the processed value
         :param check_set_errors: Toggles checking errors after setting
         :param check_get_errors: Toggles checking errors after getting
-        :param sync_command: An SCPI command *WAI, *OPC or *OPC? for command synchronization.
+        :param sync_method: An SCPI command *WAI, *OPC or *OPC? for command synchronization.
         """
 
         if map_values and isinstance(values, dict):
@@ -176,12 +249,12 @@ class Instrument(object):
 
         def fget(self):
 
-            if sync_command is None:
+            if sync_method is None:
                 vals = self.values(get_command, **kwargs)
-            elif sync_command in ["*WAI", "*OPC", "*OPC?"]:
-                vals = self.values(get_command + ";" + sync_command, **kwargs)
+            elif sync_method in ["opc_query", "stb_polling"]:
+                vals = self.values_sync(get_command, sync_method=sync_method, **kwargs)
             else:
-                raise ValueError("{} is not in {}".format(sync_command, ["*WAI", "*OPC", "*OPC?"]))
+                raise ValueError("{} is not in {}".format(sync_method, ["opc_query", "stb_polling"]))
 
             if check_get_errors:
                 self.check_errors()
@@ -215,15 +288,12 @@ class Instrument(object):
                     'Values of type `{}` are not allowed '
                     'for Instrument.control'.format(type(values))
                 )
-            if sync_command is None:
+            if sync_method is None:
                 self.write(set_command % value)
-            elif sync_command in ["*WAI", "*OPC"]:
-                self.write((set_command + ";" + sync_command) % value)
-            elif sync_command == "*OPC?":
-                self.write((set_command + ";" + sync_command) % value)
-                self.read()
+            elif sync_method in ["opc_query", "stb_polling"]:
+                self.write_sync(set_command % value, sync_method)
             else:
-                raise ValueError("{} is not in {}".format(sync_command, ["*WAI", "*OPC", "*OPC?"]))
+                raise ValueError("{} is not in {}".format(sync_method, ["opc_query", "stb_polling"]))
 
             if check_set_errors:
                 self.check_errors()
@@ -236,7 +306,9 @@ class Instrument(object):
     @staticmethod
     def measurement(get_command, docs, values=(), map_values=None,
                     get_process=lambda v: v, command_process=lambda c: c,
-                    check_get_errors=False, **kwargs):
+                    check_get_errors=False,
+                    sync_command=None,
+                    **kwargs):
         """ Returns a property for the class based on the supplied
         commands. This is a measurement quantity that may only be
         read from the instrument, not set.
@@ -252,6 +324,8 @@ class Instrument(object):
         :param command_process: A function that take a command and allows processing
                             before executing the command, for both getting and setting
         :param check_get_errors: Toggles checking errors after getting
+        :param sync_command: An SCPI command *WAI, *OPC or *OPC? for command synchronization.
+
         """
 
         if map_values and isinstance(values, dict):
@@ -259,7 +333,13 @@ class Instrument(object):
             inverse = {v: k for k, v in values.items()}
 
         def fget(self):
-            vals = self.values(command_process(get_command), **kwargs)
+            if sync_command is None:
+                vals = self.values(command_process(get_command), **kwargs)
+            elif sync_command in ["*WAI", "*OPC", "*OPC?"]:
+                vals = self.values(command_process(get_command) + ";" + sync_command, **kwargs)
+            else:
+                raise ValueError("{} is not in {}".format(sync_command, ["*WAI", "*OPC", "*OPC?"]))
+
             if check_get_errors:
                 self.check_errors()
             if len(vals) == 1:
@@ -288,6 +368,7 @@ class Instrument(object):
                 validator=lambda x, y: x, values=(), map_values=False,
                 set_process=lambda v: v,
                 check_set_errors=False,
+                sync_command=None,
                 **kwargs):
         """Returns a property for the class based on the supplied
         commands. This property may be set, but raises an exception
@@ -304,6 +385,7 @@ class Instrument(object):
         :param set_process: A function that takes a value and allows processing
                             before value mapping, returning the processed value
         :param check_set_errors: Toggles checking errors after setting
+        :param sync_command: An SCPI command *WAI, *OPC or *OPC? for command synchronization.
         """
 
         if map_values and isinstance(values, dict):
@@ -326,7 +408,15 @@ class Instrument(object):
                     'Values of type `{}` are not allowed '
                     'for Instrument.control'.format(type(values))
                 )
-            self.write(set_command % value)
+            if sync_command is None:
+                self.write(set_command % value)
+            elif sync_command in ["*WAI", "*OPC"]:
+                self.write((set_command + ";" + sync_command) % value)
+            elif sync_command == "*OPC?":
+                self.write((set_command + ";" + sync_command) % value)
+                self.read()
+            else:
+                raise ValueError("{} is not in {}".format(sync_command, ["*WAI", "*OPC", "*OPC?"]))
             if check_set_errors:
                 self.check_errors()
 
