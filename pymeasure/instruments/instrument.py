@@ -150,7 +150,10 @@ class Instrument(object):
             stb = self.read_stb()
             sleep(interval)
             elapsed = time.time() - start
+            log.debug("Polling STB <timeout:{}, interval:{}, stb:{}, mask:{}, elsapsed:{}>".format(
+                timeout, interval, stb, mask, elapsed))
             if stb & mask:
+                log.debug("STB masking condition is true")
                 break
             if elapsed > timeout:
                 raise Exception("STB polling timeout")
