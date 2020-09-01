@@ -159,11 +159,12 @@ class Instrument(object):
                 raise Exception("STB polling timeout")
         return stb
 
-    def write_sync(self, command, sync_method="opc_query"):
+    def write_sync(self, command, sync_method="opc_query", **kwargs):
         """ Writes a command to the instrument
 
         :param command: SCPI command string to be sent to the instrument
         """
+        log.debug(f"write_sync kwargs:{kwargs}")
         if sync_method == "opc_query":
             self.write(command + ";*OPC?")
             self.read()
@@ -171,15 +172,16 @@ class Instrument(object):
             self.write("*ESE 1")
             self.ask("*ESR?")
             self.write(command + ";*OPC")
-            self.stb_polling()
+            self.stb_polling(**kwargs)
         else:
             self.write(command)
 
-    def ask_sync(self, command, sync_method="opc_query"):
+    def ask_sync(self, command, sync_method="opc_query", **kwargs):
         """ Writes a command to the instrument
 
         :param command: SCPI command string to be sent to the instrument
         """
+        log.debug(f"ask_sync kwargs:{kwargs}")
         if sync_method == "opc_query":
             self.write(command + ";*OPC?")
             result = self.read()
@@ -187,14 +189,14 @@ class Instrument(object):
             self.write("*ESE 1")
             self.ask("*ESR?")
             self.write(command + ";*OPC")
-            self.stb_polling()
+            self.stb_polling(**kwargs)
             result = self.read()
         else:
             result = self.ask(command)
-        log.debug(result)
+        log.debug("<ask_sync result:{}>".format(result))
         return result.split(";")[0]  # remove the OPC status if any
 
-    def values_sync(self, command, separator=',', cast=float, sync_method="opc_query"):
+    def values_sync(self, command, separator=',', cast=float, sync_method="opc_query", **kwargs):
         """ Writes a command to the instrument and returns a list of formatted
         values from the result
 
@@ -203,7 +205,8 @@ class Instrument(object):
         :param cast: A type to cast the result
         :returns: A list of the desired type, or strings where the casting fails
         """
-        results = str(self.ask_sync(command, sync_method)).strip()
+        log.debug(f"values_sync kwargs:{kwargs}")
+        results = str(self.ask_sync(command, sync_method, **kwargs)).strip()
         results = results.split(separator)
         for i, result in enumerate(results):
             try:
@@ -294,7 +297,7 @@ class Instrument(object):
             if sync_method is None:
                 self.write(set_command % value)
             elif sync_method in ["opc_query", "stb_polling"]:
-                self.write_sync(set_command % value, sync_method)
+                self.write_sync(set_command % value, sync_method, **kwargs)
             else:
                 raise ValueError("{} is not in {}".format(sync_method, ["opc_query", "stb_polling"]))
 
