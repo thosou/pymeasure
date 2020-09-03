@@ -195,7 +195,7 @@ class Instrument(object):
             result = self.read()
         else:
             result = self.ask(command)
-        log.debug("ask_sync result:<{}>".format(result))
+        log.debug("ask_sync result:<{}>".format(result.strip()))
         return result.split(";")[0]  # remove the OPC status if any
 
     def values_sync(self, command, separator=',', cast=float, sync_method="opc_query", **kwargs):
