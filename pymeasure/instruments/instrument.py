@@ -144,7 +144,7 @@ class Instrument(object):
          to viReadSTB function of the VISA library."""
         return self.adapter.connection.read_stb()
 
-    def stb_polling(self, timeout=2, interval=0.1, mask=0b00100000, **kwargs):
+    def stb_polling(self, timeout=5, interval=0.1, mask=0b00100000, **kwargs):
         start = time.time()
         while True:
             stb = self.read_stb()
